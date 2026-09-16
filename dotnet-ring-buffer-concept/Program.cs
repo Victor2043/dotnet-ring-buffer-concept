@@ -56,62 +56,49 @@ class Program
         Console.WriteLine($"\nBuffer Empty at the end? {ringBuffer.IsEmpty}");
     }
 }
-
-
 public sealed class RingBuffer<T>
 {
     private readonly T[] _buffer;
     private readonly int _capacity;
-    private int _head; // Write pointer
-    private int _tail; // Read pointer
+
+    // Pointers represent absolute operation counters (Monotonic)
+    private ulong _writeHead; // Total items written
+    private ulong _readTail;  // Total items read
 
     public RingBuffer(int capacity)
     {
         if (capacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be greater than zero.");
 
-        // Reserve +1 internal slot to distinguish the "Full" state from the "Empty" state
-        _capacity = capacity + 1;
+        // No internal +1 reservation needed anymore
+        _capacity = capacity;
         _buffer = new T[_capacity];
-        _head = 0;
-        _tail = 0;
+        _writeHead = 0;
+        _readTail = 0;
     }
 
-    public int Capacity => _capacity - 1;
+    public int Capacity => _capacity;
 
-    public bool IsEmpty => _head == _tail;
+    // Pending items count for reading
+    public int Count => (int)(_writeHead - _readTail);
 
-    public bool IsFull => (_head + 1) % _capacity == _tail;
+    public bool IsEmpty => _writeHead == _readTail;
 
-    public int Count
-    {
-        get
-        {
-            if (_head >= _tail)
-                return _head - _tail;
+    public bool IsFull => Count == _capacity;
 
-            return _capacity - (_tail - _head);
-        }
-    }
-
-    /// <summary>
-    /// Attempts to write an element to the buffer.
-    /// Returns false if the buffer is full.
-    /// </summary>
     public bool TryWrite(T item)
     {
         if (IsFull)
             return false;
 
-        _buffer[_head] = item;
-        _head = (_head + 1) % _capacity; // Circular advancement using modulo
+        // Physical index derived on-the-fly
+        int index = (int)(_writeHead % (ulong)_capacity);
+        _buffer[index] = item;
+
+        _writeHead++; // Monotonic increment
         return true;
     }
 
-    /// <summary>
-    /// Attempts to read and remove an element from the buffer.
-    /// Returns false if the buffer is empty.
-    /// </summary>
     public bool TryRead(out T result)
     {
         if (IsEmpty)
@@ -120,9 +107,12 @@ public sealed class RingBuffer<T>
             return false;
         }
 
-        result = _buffer[_tail];
-        _buffer[_tail] = default!; // Clear the reference to prevent memory leaks for reference types
-        _tail = (_tail + 1) % _capacity; // Circular advancement using modulo
+        // Physical index derived on-the-fly
+        int index = (int)(_readTail % (ulong)_capacity);
+        result = _buffer[index];
+
+        _buffer[index] = default!; // Clear reference
+        _readTail++;               // Monotonic increment
         return true;
     }
 }
