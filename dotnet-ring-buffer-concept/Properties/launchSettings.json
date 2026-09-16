@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "dotnet-ring-buffer-concept": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
