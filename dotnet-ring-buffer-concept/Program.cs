@@ -1,4 +1,5 @@
 ﻿using System;
+using dotnet_ring_buffer_concept;
 
 namespace DotNetRingBufferConcept;
 
@@ -6,10 +7,12 @@ class Program
 {
     static void Main()
     {
-        Console.WriteLine("=== Ring Buffer Concept - Commit 01: Basic Prototype ===");
+        Console.WriteLine("=== Ring Buffer Concept  ===");
 
         // Buffer Size 4
-        var ringBuffer = new RingBuffer<int>(capacity: 4);
+        // The caller owns the memory backing array (or memory slice)
+        Span<int> memoryBacking = stackalloc int[4]; // Allocated on Stack, 0 Heap pressure
+        var ringBuffer = new RingBuffer<int>(memoryBacking);
 
         Console.WriteLine($"Total Capacity: {ringBuffer.Capacity}");
         Console.WriteLine($"Empty on startup? {ringBuffer.IsEmpty}\n");
@@ -54,65 +57,5 @@ class Program
         }
 
         Console.WriteLine($"\nBuffer Empty at the end? {ringBuffer.IsEmpty}");
-    }
-}
-public sealed class RingBuffer<T>
-{
-    private readonly T[] _buffer;
-    private readonly int _capacity;
-
-    // Pointers represent absolute operation counters (Monotonic)
-    private ulong _writeHead; // Total items written
-    private ulong _readTail;  // Total items read
-
-    public RingBuffer(int capacity)
-    {
-        if (capacity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be greater than zero.");
-
-        // No internal +1 reservation needed anymore
-        _capacity = capacity;
-        _buffer = new T[_capacity];
-        _writeHead = 0;
-        _readTail = 0;
-    }
-
-    public int Capacity => _capacity;
-
-    // Pending items count for reading
-    public int Count => (int)(_writeHead - _readTail);
-
-    public bool IsEmpty => _writeHead == _readTail;
-
-    public bool IsFull => Count == _capacity;
-
-    public bool TryWrite(T item)
-    {
-        if (IsFull)
-            return false;
-
-        // Physical index derived on-the-fly
-        int index = (int)(_writeHead % (ulong)_capacity);
-        _buffer[index] = item;
-
-        _writeHead++; // Monotonic increment
-        return true;
-    }
-
-    public bool TryRead(out T result)
-    {
-        if (IsEmpty)
-        {
-            result = default!;
-            return false;
-        }
-
-        // Physical index derived on-the-fly
-        int index = (int)(_readTail % (ulong)_capacity);
-        result = _buffer[index];
-
-        _buffer[index] = default!; // Clear reference
-        _readTail++;               // Monotonic increment
-        return true;
     }
 }
