@@ -1,7 +1,4 @@
-﻿using System;
-using dotnet_ring_buffer_concept;
-
-namespace DotNetRingBufferConcept;
+﻿namespace DotNetRingBufferConcept;
 
 class Program
 {

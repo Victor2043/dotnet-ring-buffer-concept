@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35913.81 d17.13
+VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dotnet-ring-buffer-concept", "dotnet-ring-buffer-concept\dotnet-ring-buffer-concept.csproj", "{D794CFDE-C8D8-488C-AEC6-BFD137BE45CA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotNetRingBufferConcept", "dotnet-ring-buffer-concept\DotNetRingBufferConcept.csproj", "{D794CFDE-C8D8-488C-AEC6-BFD137BE45CA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
