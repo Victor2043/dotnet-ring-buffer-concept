@@ -8,8 +8,11 @@ class Program
 
         // Buffer Size 4
         // The caller owns the memory backing array (or memory slice)
-        Span<int> memoryBacking = stackalloc int[4]; // Allocated on Stack, 0 Heap pressure
-        var ringBuffer = new RingBuffer<int>(memoryBacking);
+
+        // Span<int> memoryBacking = stackalloc int[4]; // Allocated on Stack, 0 Heap pressure
+        // var ringBuffer = new RingBuffer<int>(memoryBacking);
+
+        var ringBuffer = new SpscRingBuffer<int>(4);
 
         Console.WriteLine($"Total Capacity: {ringBuffer.Capacity}");
         Console.WriteLine($"Empty on startup? {ringBuffer.IsEmpty}\n");
