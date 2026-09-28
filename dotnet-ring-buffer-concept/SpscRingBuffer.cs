@@ -1,20 +1,22 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 
 namespace DotNetRingBufferConcept;
 
 /// <summary>
-/// Fifth evolution: Thread-safe Single-Producer Single-Consumer (SPSC) Lock-Free Ring Buffer.
-/// Uses volatile memory barriers to guarantee acquire-release semantics without locks.
+/// Sixth evolution: Cache-line padded SPSC Lock-Free Ring Buffer.
+/// Eliminates False Sharing between producer and consumer threads.
 /// </summary>
-
 public sealed class SpscRingBuffer<T>
 {
     private readonly T[] _buffer;
     private readonly int _capacityMask;
 
-    // Pointers accessed concurrently by separate threads
-    private ulong _writeHead; // Written by Producer, read by Consumer
-    private ulong _readTail;  // Written by Consumer, read by Producer
+    // Cache line 1: Modified exclusively by Producer
+    private PaddedHead _head;
+
+    // Cache line 2: Modified exclusively by Consumer
+    private PaddedTail _tail;
 
     public SpscRingBuffer(int capacity)
     {
@@ -26,67 +28,75 @@ public sealed class SpscRingBuffer<T>
 
         _buffer = new T[capacity];
         _capacityMask = capacity - 1;
-        _writeHead = 0;
-        _readTail = 0;
+        _head = default;
+        _tail = default;
     }
 
     public int Capacity => _capacityMask + 1;
 
-    // Volatile read guarantees reading fresh value from main memory/cache hierarchy
     public int Count
     {
         get
         {
-            ulong head = Volatile.Read(ref _writeHead);
-            ulong tail = Volatile.Read(ref _readTail);
+            ulong head = Volatile.Read(ref _head.Value);
+            ulong tail = Volatile.Read(ref _tail.Value);
             return (int)(head - tail);
         }
     }
 
-    public bool IsEmpty => Volatile.Read(ref _writeHead) == Volatile.Read(ref _readTail);
+    public bool IsEmpty => Volatile.Read(ref _head.Value) == Volatile.Read(ref _tail.Value);
 
     public bool IsFull => Count == Capacity;
 
-    /// <summary>
-    /// Called strictly by the PRODUCER thread.
-    /// </summary>
     public bool TryWrite(T item)
     {
-        ulong currentHead = _writeHead; // Local read (Producer owns _writeHead)
-        ulong currentTail = Volatile.Read(ref _readTail); // Acquire semantics (Read tail updated by Consumer)
+        ulong currentHead = _head.Value; // Producer local read
+        ulong currentTail = Volatile.Read(ref _tail.Value); // Consumer tail acquire
 
         if ((int)(currentHead - currentTail) == Capacity)
-            return false; // Buffer Full
+            return false;
 
         int index = (int)(currentHead & (ulong)_capacityMask);
         _buffer[index] = item;
 
-        // Release semantics: Guarantees array write is visible BEFORE head pointer update
-        Volatile.Write(ref _writeHead, currentHead + 1);
+        // Release write strictly on Producer's cache line
+        Volatile.Write(ref _head.Value, currentHead + 1);
         return true;
     }
 
-    /// <summary>
-    /// Called strictly by the CONSUMER thread.
-    /// </summary>
     public bool TryRead(out T result)
     {
-        ulong currentTail = _readTail; // Local read (Consumer owns _readTail)
-        ulong currentHead = Volatile.Read(ref _writeHead); // Acquire semantics (Read head updated by Producer)
+        ulong currentTail = _tail.Value; // Consumer local read
+        ulong currentHead = Volatile.Read(ref _head.Value); // Producer head acquire
 
         if (currentHead == currentTail)
         {
             result = default!;
-            return false; // Buffer Empty
+            return false;
         }
 
         int index = (int)(currentTail & (ulong)_capacityMask);
         result = _buffer[index];
 
-        _buffer[index] = default!; // Clear reference
+        _buffer[index] = default!;
 
-        // Release semantics: Guarantees item read is completed BEFORE tail pointer update
-        Volatile.Write(ref _readTail, currentTail + 1);
+        // Release write strictly on Consumer's cache line
+        Volatile.Write(ref _tail.Value, currentTail + 1);
         return true;
+    }
+
+    // Explicit layout guaranteeing 64-byte alignment and padding per struct
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    private struct PaddedHead
+    {
+        [FieldOffset(0)]
+        public ulong Value;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    private struct PaddedTail
+    {
+        [FieldOffset(0)]
+        public ulong Value;
     }
 }
